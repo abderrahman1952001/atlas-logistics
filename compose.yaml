@@ -1,0 +1,78 @@
+name: atlas-logistics
+services:
+  db:
+    image: docker.io/library/postgres:17-alpine
+    environment:
+      POSTGRES_DB: atlas
+      POSTGRES_USER: atlas
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-atlas-local-only}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U atlas -d atlas']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+  setup:
+    build:
+      context: .
+      target: api
+    environment:
+      DATABASE_URL: postgres://atlas:${POSTGRES_PASSWORD:-atlas-local-only}@db:5432/atlas
+      DEMO_MODE: ${DEMO_MODE:-true}
+      DEMO_PASSWORD: ${DEMO_PASSWORD:-AtlasDemo!2026}
+    command:
+      [
+        'sh',
+        '-c',
+        'node scripts/migrate.mjs && if [ "$$DEMO_MODE" = true ]; then node scripts/seed.mjs; fi',
+      ]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: 'no'
+  api:
+    build:
+      context: .
+      target: api
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      TRUST_PROXY_HOPS: 1
+      DATABASE_URL: postgres://atlas:${POSTGRES_PASSWORD:-atlas-local-only}@db:5432/atlas
+      APP_ORIGIN: ${APP_ORIGIN:-http://localhost:8080}
+      COOKIE_SECURE: 'false'
+      DEMO_MODE: ${DEMO_MODE:-true}
+    depends_on:
+      setup:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3000/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+    security_opt: ['no-new-privileges:true']
+  web:
+    build:
+      context: .
+      target: web
+      args:
+        VITE_DEMO_MODE: ${DEMO_MODE:-true}
+    ports:
+      - '127.0.0.1:8080:8080'
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    security_opt: ['no-new-privileges:true']
+volumes:
+  postgres_data:

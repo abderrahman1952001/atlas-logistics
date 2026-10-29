@@ -1,0 +1,23 @@
+{
+  "name": "atlas-logistics",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Atlas logistics workflow — NestJS, PostgreSQL, React and Docker",
+  "workspaces": [
+    "api",
+    "web"
+  ],
+  "engines": {
+    "node": ">=24.19.0 <25"
+  },
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "typecheck": "npm run typecheck --workspaces",
+    "test": "node --test --test-concurrency=1 tests/*.test.mjs",
+    "test:integration": "node --test --test-concurrency=1 tests/*.test.mjs",
+    "migrate": "npm run migrate --workspace api",
+    "seed": "npm run seed --workspace api",
+    "dev:api": "npm run dev --workspace api",
+    "dev:web": "npm run dev --workspace web"
+  }
+}
